@@ -618,17 +618,15 @@
       // Compute full shareable URL
       function getShareableUrl(href) {
         const cleanName = href.replace(/^quizzes\//, '').replace(/^\.\//, '');
-        // On GitHub Pages or when viewing file:// directly, provide canonical GitHub Pages link
-        if (window.location.protocol === 'file:' || window.location.hostname.endsWith('github.io')) {
-          const basePath = window.location.pathname.includes('/De-in-Be') ? '/De-in-Be/' : '/';
-          return window.location.origin.includes('localhost') 
-            ? 'https://boba-and-co.github.io/De-in-Be/' + cleanName
-            : window.location.origin + basePath + cleanName;
+        // On file: protocol or local preview, default to canonical GitHub Pages link
+        if (window.location.protocol === 'file:') {
+          return 'https://boba-and-co.github.io/de-in-be/' + cleanName;
         }
         try {
-          return new URL(href, window.location.href).href;
+          // Resolve relative to current directory/origin dynamically
+          return new URL(cleanName, window.location.href).href;
         } catch (e) {
-          return window.location.origin + '/' + href;
+          return window.location.origin + '/' + cleanName;
         }
       }
 

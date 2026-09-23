@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Copy quiz HTML files into a deployable public folder and inject tracker.js."""
+
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+QUIZZES_DIR = ROOT / "quizzes"
+PUBLIC_DIR = ROOT / "public"
+PUBLIC_QUIZZES_DIR = PUBLIC_DIR / "quizzes"
+TRACKER_PATH = ROOT / "tracker.js"
+
+
+def format_tracker_script() -> str:
+    tracker_text = TRACKER_PATH.read_text(encoding="utf-8")
+    webhook_url = os.environ.get(
+        "WEBHOOK_URL",
+        "https://script.google.com/macros/s/AKfycbwCyFNl3J7AFyLbMwLhzKyoXNodUuFoPRbuH4iGXVrHtkFLQCBepANj-i0k89p65LE4Ag/exec"
+    ).strip()
+    if webhook_url:
+        tracker_text = re.sub(
+            r"const\s+WEBHOOK_URL\s*=\s*['\"][^'\"]*['\"];",
+            f"const WEBHOOK_URL = '{webhook_url}';",
+            tracker_text
+        )
+    return f"<script>\n{tracker_text}\n</script>\n"
+
+
+def normalize_h5p_paths(text: str) -> str:
+    return text.replace('"ajaxPath":"/h5p/ajax?action="', '"ajaxPath":"./h5p/ajax?action="')
+
+
+def inject_quiz_page_styles(html_text: str) -> str:
+    css = """
+    <style>
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #f8fafc !important;
+      }
+      body {
+        margin: 0 !important;
+        padding: 24px 16px !important;
+        box-sizing: border-box !important;
+      }
+      .h5p-content,
+      .h5p-iframe,
+      .h5p-container {
+        width: 100% !important;
+        max-width: 980px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        box-sizing: border-box !important;
+      }
+    </style>
+    """
+
+    if "</body>" in html_text:
+        return html_text.replace("</body>", f"{css}</body>", 1)
+    return f"{css}{html_text}"
+
+
+def inject_tracker(html_text: str) -> str:
+    text = normalize_h5p_paths(html_text)
+    text = inject_quiz_page_styles(text)
+    script_block = format_tracker_script()
+    if "</body>" in text:
+        return text.replace("</body>", f"{script_block}</body>", 1)
+    return f"{text}{script_block}"
+
+
+def main() -> None:
+    if PUBLIC_DIR.exists():
+        shutil.rmtree(PUBLIC_DIR)
+    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+    PUBLIC_QUIZZES_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not QUIZZES_DIR.exists():
+        raise FileNotFoundError(f"Missing quizzes directory: {QUIZZES_DIR}")
+
+    quiz_files = sorted(QUIZZES_DIR.glob("*.html"))
+    for quiz_file in quiz_files:
+        raw_text = quiz_file.read_text(encoding="utf-8", errors="ignore")
+        injected = inject_tracker(raw_text)
+        # Write to public root (for direct exercise links https://.../<quiz>.html)
+        (PUBLIC_DIR / quiz_file.name).write_text(injected, encoding="utf-8")
+        # Write to public/quizzes/ (for backwards-compatible https://.../quizzes/<quiz>.html)
+        (PUBLIC_QUIZZES_DIR / quiz_file.name).write_text(injected, encoding="utf-8")
+
+    (PUBLIC_DIR / ".nojekyll").write_text("", encoding="utf-8")
+
+    cmd = ["python3", str(ROOT / "generate_index.py"), "--public-dir", str(PUBLIC_DIR)]
+    results_url = os.environ.get("RESULTS_URL", "").strip()
+    if results_url:
+        cmd.extend(["--results-url", results_url])
+    subprocess.run(cmd, check=True)
+
+    manifest_path = ROOT / "quizzes.json"
+    if manifest_path.exists():
+        shutil.copy2(manifest_path, PUBLIC_DIR / "quizzes.json")
+
+    print(f"Built {PUBLIC_DIR} with {len(quiz_files)} quiz pages (accessible at both / and /quizzes/).")
+
+
+if __name__ == "__main__":
+    main()
+

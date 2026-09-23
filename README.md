@@ -30,9 +30,11 @@ The system uses [H5P](https://h5p.org/) via the free desktop editor [Lumi](https
 ```
 ├── quizzes/              # Drop raw exported Lumi HTML files here
 │   └── example-quiz.html
+├── build_public.py       # Prepares public/ distribution folder and injects tracker.js
 ├── generate_index.py     # Automatically scans quizzes and generates the portal
 ├── index.html            # Minimal and clean quiz portal (root preview)
 ├── tracker.js            # Standalone listener that intercepts H5P xAPI events
+├── apps_script_webhook.gs # Google Apps Script webhook code for Google Sheets logging
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml    # Injects tracker.js, builds portal, and deploys to Pages
@@ -79,13 +81,14 @@ Open the connected Google Sheet to review:
    ```
    Timestamp | Student | Activity | Score | Max Score | Mistakes
    ```
-2. Open **Extensions > Apps Script** and insert the `doPost` handler script that processes incoming JSON payloads and applies `SpreadsheetApp.newTextStyle().setForegroundColor("#D93025")` to mistaken substrings.
+2. Open **Extensions > Apps Script**, paste the contents of `apps_script_webhook.gs`, and save.
 3. Deploy as a Web App:
    - **Execute as**: Me
    - **Who has access**: Anyone
 4. Copy the generated Web App URL (`.../exec`).
 
 ### 2. Repository Configuration
-1. Paste your Google Web App URL into the `WEBHOOK_URL` constant inside `tracker.js`.
-2. Ensure `.github/workflows/deploy.yml` is enabled.
-3. Under **Settings > Pages > Build and deployment > Source**, select **GitHub Actions**.
+1. Add the Google Web App URL to your repository secrets as `WEBHOOK_URL` (or paste it into `tracker.js`).
+2. (Optional) Add your Google Sheet URL to repository secrets as `RESULTS_URL`.
+3. Ensure `.github/workflows/deploy.yml` is enabled.
+4. Under **Settings > Pages > Build and deployment > Source**, select **GitHub Actions**.

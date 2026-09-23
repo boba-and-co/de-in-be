@@ -16,21 +16,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject Tracker Script into all Quiz Files
+      - name: Build deployable quiz site
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          RESULTS_URL: ${{ secrets.RESULTS_URL }}
         run: |
-          mkdir -p public
-          cp -r quizzes/* public/ 2>/dev/null || true
-          for file in public/*.html; do
-            if [ -f "$file" ]; then
-              sed -i '/<\/body>/i <script>' "$file"
-              sed -i '/<\/body>/e cat tracker.js' "$file"
-              sed -i '/<\/body>/i </script>' "$file"
-            fi
-          done
-
-      - name: Generate Quiz Index Page
-        run: |
-          python3 generate_index.py --public-dir public
+          python3 build_public.py
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

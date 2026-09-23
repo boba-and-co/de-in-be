@@ -56,9 +56,9 @@ def extract_metadata(filepath: str) -> dict:
     library_type = None
 
     try:
-        # Read the first 64 KB where H5PIntegration configuration is placed
+        # Read the first 512 KB where H5PIntegration configuration is placed
         with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-            chunk = f.read(65536)
+            chunk = f.read(524288)
 
         # 1. Look for metadata title: "metadata":{"license":"...","title":"..."}
         m_meta = re.search(r'"metadata"\s*:\s*\{[^}]*?"title"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', chunk)
@@ -108,12 +108,21 @@ def scan_quizzes(quiz_dir: str) -> list:
     if not os.path.isdir(quiz_dir):
         return quizzes
 
-    for fname in sorted(os.listdir(quiz_dir)):
-        if fname.lower().endswith(".html") and not fname.startswith("."):
-            full_path = os.path.join(quiz_dir, fname)
-            if os.path.isfile(full_path):
-                meta = extract_metadata(full_path)
-                quizzes.append(meta)
+    candidates = [quiz_dir]
+    nested_dir = os.path.join(quiz_dir, "quizzes")
+    if os.path.isdir(nested_dir):
+        candidates.append(nested_dir)
+
+    seen = set()
+    for target_dir in candidates:
+        for fname in sorted(os.listdir(target_dir)):
+            if fname.lower().endswith(".html") and not fname.startswith("."):
+                full_path = os.path.join(target_dir, fname)
+                if os.path.isfile(full_path) and full_path not in seen:
+                    seen.add(full_path)
+                    meta = extract_metadata(full_path)
+                    meta["filename"] = os.path.relpath(full_path, quiz_dir)
+                    quizzes.append(meta)
 
     # Sort alphabetically by title
     quizzes.sort(key=lambda x: x["title"].lower())
@@ -650,17 +659,15 @@ def render_html(quizzes: list, link_prefix: str = "", results_url: str = DEFAULT
       // Compute full shareable URL
       function getShareableUrl(href) {{
         const cleanName = href.replace(/^quizzes\\//, '').replace(/^\\.\\//, '');
-        // On GitHub Pages or when viewing file:// directly, provide canonical GitHub Pages link
-        if (window.location.protocol === 'file:' || window.location.hostname.endsWith('github.io')) {{
-          const basePath = window.location.pathname.includes('/De-in-Be') ? '/De-in-Be/' : '/';
-          return window.location.origin.includes('localhost') 
-            ? 'https://boba-and-co.github.io/De-in-Be/' + cleanName
-            : window.location.origin + basePath + cleanName;
+        // On file: protocol or local preview, default to canonical GitHub Pages link
+        if (window.location.protocol === 'file:') {{
+          return 'https://boba-and-co.github.io/de-in-be/' + cleanName;
         }}
         try {{
-          return new URL(href, window.location.href).href;
+          // Resolve relative to current directory/origin dynamically
+          return new URL(cleanName, window.location.href).href;
         }} catch (e) {{
-          return window.location.origin + '/' + href;
+          return window.location.origin + '/' + cleanName;
         }}
       }}
 
@@ -813,9 +820,9 @@ def main():
     manifest_target.write_text(json.dumps(quizzes, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Generated {manifest_target}")
 
-    # If public directory already exists, update public/index.html too
+    # If public directory already exists and was not explicitly targeted via --public-dir, update it too
     public_dir = project_root / "public"
-    if public_dir.is_dir():
+    if public_dir.is_dir() and not args.public_dir:
         pub_target = public_dir / "index.html"
         pub_html = render_html(quizzes, link_prefix="", results_url=args.results_url)
         pub_target.write_text(pub_html, encoding="utf-8")
