@@ -35,8 +35,8 @@ def normalize_h5p_paths(text: str) -> str:
     return text.replace('"ajaxPath":"/h5p/ajax?action="', '"ajaxPath":"./h5p/ajax?action="')
 
 
-def inject_quiz_page_styles(html_text: str) -> str:
-    css = """
+def get_quiz_page_styles() -> str:
+    return """
     <style>
       html, body {
         margin: 0 !important;
@@ -62,18 +62,19 @@ def inject_quiz_page_styles(html_text: str) -> str:
     </style>
     """
 
-    if "</body>" in html_text:
-        return html_text.replace("</body>", f"{css}</body>", 1)
-    return f"{css}{html_text}"
-
 
 def inject_tracker(html_text: str) -> str:
     text = normalize_h5p_paths(html_text)
-    text = inject_quiz_page_styles(text)
+    css = get_quiz_page_styles()
     script_block = format_tracker_script()
-    if "</body>" in text:
-        return text.replace("</body>", f"{script_block}</body>", 1)
-    return f"{text}{script_block}"
+    injection = f"{css}\n{script_block}\n"
+
+    # Use rfind to inject before the REAL closing </body> at the end of document,
+    # never before any '</body>' string literals inside embedded H5P JavaScript.
+    pos = text.rfind("</body>")
+    if pos != -1:
+        return text[:pos] + injection + text[pos:]
+    return text + injection
 
 
 def main() -> None:
