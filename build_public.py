@@ -40,7 +40,7 @@ def get_quiz_page_styles() -> str:
       html, body {
         margin: 0 !important;
         padding: 0 !important;
-        background: #f8fafc !important;
+        background: #ffffff !important;
       }
       body {
         margin: 0 !important;
