@@ -18,16 +18,15 @@ TRACKER_PATH = ROOT / "tracker.js"
 
 def format_tracker_script() -> str:
     tracker_text = TRACKER_PATH.read_text(encoding="utf-8")
-    webhook_url = os.environ.get(
-        "WEBHOOK_URL",
-        "https://script.google.com/macros/s/AKfycbwCyFNl3J7AFyLbMwLhzKyoXNodUuFoPRbuH4iGXVrHtkFLQCBepANj-i0k89p65LE4Ag/exec"
-    ).strip()
-    if webhook_url:
-        tracker_text = re.sub(
-            r"const\s+WEBHOOK_URL\s*=\s*['\"][^'\"]*['\"];",
-            f"const WEBHOOK_URL = '{webhook_url}';",
-            tracker_text
-        )
+    webhook_url = (
+        os.environ.get("WEBHOOK_URL", "").strip()
+        or "https://script.google.com/macros/s/AKfycbwCyFNl3J7AFyLbMwLhzKyoXNodUuFoPRbuH4iGXVrHtkFLQCBepANj-i0k89p65LE4Ag/exec"
+    )
+    tracker_text = re.sub(
+        r"const\s+WEBHOOK_URL\s*=\s*['\"][^'\"]*['\"];",
+        f"const WEBHOOK_URL = '{webhook_url}';",
+        tracker_text
+    )
     return f"<script>\n{tracker_text}\n</script>\n"
 
 
@@ -98,9 +97,11 @@ def main() -> None:
     (PUBLIC_DIR / ".nojekyll").write_text("", encoding="utf-8")
 
     cmd = ["python3", str(ROOT / "generate_index.py"), "--public-dir", str(PUBLIC_DIR)]
-    results_url = os.environ.get("RESULTS_URL", "").strip()
-    if results_url:
-        cmd.extend(["--results-url", results_url])
+    results_url = (
+        os.environ.get("RESULTS_URL", "").strip()
+        or "https://docs.google.com/spreadsheets/d/1mO893ESTXibzcYJctNgFFBaJz8950gYkCsjPpCMIrN0/edit?pli=1&gid=0#gid=0"
+    )
+    cmd.extend(["--results-url", results_url])
     subprocess.run(cmd, check=True)
 
     manifest_path = ROOT / "quizzes.json"

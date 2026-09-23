@@ -221,13 +221,19 @@
           errors: accumulatedText ? errorRanges : []
         };
 
+        console.log('[Quiz Tracker] Sending results to webhook:', payload);
         fetch(WEBHOOK_URL, {
           method: 'POST',
           mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         })
-          .catch(() => {})
+          .then(() => {
+            console.log('[Quiz Tracker] Webhook request dispatched successfully.');
+          })
+          .catch((err) => {
+            console.error('[Quiz Tracker] Webhook request failed:', err);
+          })
           .finally(() => {
             setTimeout(() => {
               isSubmitting = false;

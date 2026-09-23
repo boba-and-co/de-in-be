@@ -35,9 +35,9 @@ H5P_LIBRARY_NAMES = {
     "Questionnaire": "Questionnaire",
 }
 
-DEFAULT_RESULTS_URL = os.environ.get(
-    "RESULTS_URL",
-    "https://docs.google.com/spreadsheets/d/1mO893ESTXibzcYJctNgFFBaJz8950gYkCsjPpCMIrN0/edit?pli=1&gid=0#gid=0"
+DEFAULT_RESULTS_URL = (
+    os.environ.get("RESULTS_URL", "").strip()
+    or "https://docs.google.com/spreadsheets/d/1mO893ESTXibzcYJctNgFFBaJz8950gYkCsjPpCMIrN0/edit?pli=1&gid=0#gid=0"
 )
 
 
@@ -129,11 +129,12 @@ def scan_quizzes(quiz_dir: str) -> list:
     return quizzes
 
 
-def render_html(quizzes: list, link_prefix: str = "", results_url: str = DEFAULT_RESULTS_URL) -> str:
+def render_html(quizzes: list, link_prefix: str = "", results_url: str = "") -> str:
     """Generate the minimal and clean index.html string."""
+    effective_results_url = (results_url or "").strip() or DEFAULT_RESULTS_URL
     cards_html = []
     quizzes_json_data = []
-    safe_results_url = html.escape(results_url)
+    safe_results_url = html.escape(effective_results_url)
 
     for item in quizzes:
         href = f"{link_prefix}{item['filename']}"
@@ -783,6 +784,7 @@ def main():
     project_root = Path(__file__).resolve().parent
     quizzes_dir = project_root / args.quizzes_dir
 
+    effective_results_url = (args.results_url or "").strip() or DEFAULT_RESULTS_URL
     print(f"Scanning quizzes in {quizzes_dir}...")
     quizzes = scan_quizzes(str(quizzes_dir))
     print(f"Found {len(quizzes)} quizzes:")
@@ -795,7 +797,7 @@ def main():
         out_path.parent.mkdir(parents=True, exist_ok=True)
         # Determine prefix: if outputting into public, files are siblings so prefix is ""
         prefix = "" if out_path.parent.name == "public" else "quizzes/"
-        html_content = render_html(quizzes, link_prefix=prefix, results_url=args.results_url)
+        html_content = render_html(quizzes, link_prefix=prefix, results_url=effective_results_url)
         out_path.write_text(html_content, encoding="utf-8")
         print(f"Generated {out_path} (prefix='{prefix}')")
         return
@@ -804,14 +806,14 @@ def main():
     if args.public_dir:
         pub_path = Path(args.public_dir)
         pub_path.mkdir(parents=True, exist_ok=True)
-        html_content = render_html(quizzes, link_prefix="", results_url=args.results_url)
+        html_content = render_html(quizzes, link_prefix="", results_url=effective_results_url)
         target = pub_path / "index.html"
         target.write_text(html_content, encoding="utf-8")
         print(f"Generated {target} for deployment.")
 
     # Default: Generate root index.html (links to quizzes/)
     root_target = project_root / "index.html"
-    root_html = render_html(quizzes, link_prefix="quizzes/", results_url=args.results_url)
+    root_html = render_html(quizzes, link_prefix="quizzes/", results_url=effective_results_url)
     root_target.write_text(root_html, encoding="utf-8")
     print(f"Generated {root_target}")
 
@@ -824,7 +826,7 @@ def main():
     public_dir = project_root / "public"
     if public_dir.is_dir() and not args.public_dir:
         pub_target = public_dir / "index.html"
-        pub_html = render_html(quizzes, link_prefix="", results_url=args.results_url)
+        pub_html = render_html(quizzes, link_prefix="", results_url=effective_results_url)
         pub_target.write_text(pub_html, encoding="utf-8")
         print(f"Updated {pub_target}")
 
